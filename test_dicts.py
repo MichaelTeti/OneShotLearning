@@ -1,17 +1,13 @@
-import glob
-import os
+import tensorflow as tf
 from scipy.misc import *
 import numpy as np
-import tensorflow as tf
-from scipy.io import loadmat
 from image_reader import *
 from skimage.util import view_as_windows as vaw
-import sys
 
 
 ps=16
 
-    
+
 def LCA(y, iters, batch_sz, num_dict_features=None, D=None):
   ''' Dynamical systems neural network used for sparse approximation of an
       input vector.
@@ -37,7 +33,7 @@ def LCA(y, iters, batch_sz, num_dict_features=None, D=None):
     a=tf.matmul(tf.transpose(D), batch)
     a=tf.matmul(a, tf.diag(1/(tf.sqrt(tf.reduce_sum(a**2, 0))+1e-6)))
     a=0.3*a**3
-    a=a*tf.cast(tf.round(tf.random_uniform([num_dict_features, batch_sz])), tf.float64)
+    #a=a*tf.cast(tf.round(tf.random_uniform([num_dict_features, batch_sz])), tf.float64)
     D=D+tf.matmul((batch-tf.matmul(D, a)), tf.transpose(a))
   return sess.run(D), sess.run(a)
 
@@ -45,27 +41,60 @@ def LCA(y, iters, batch_sz, num_dict_features=None, D=None):
 
 with tf.Session() as sess:
 
-  x, y=read_ims('/home/mpcr/Documents/MT/CSDL/17flowers/jpg', 100)
+  im=imresize(imread('lily.jpg'), [100, 100])
 
-  x=np.pad(x[:80, :, :, :], ((0, 0), (ps/2, ps/2), (ps/2, ps/2), (0, 0)), 'edge')
+  recd=np.zeros(im.shape)
 
-  x=vaw(x, (1, ps, ps, 3))
+  recnd=np.zeros(im.shape)
 
-  x=x.reshape([x.shape[0]*
-	       x.shape[1]*
-	       x.shape[2]*
-	       x.shape[3], -1])
+  testim=vaw(im, (ps, ps, 3))
 
-  x=normalize(x.transpose())
+  testim=testim.reshape([testim.shape[0]*
+			 testim.shape[1]*
+			 testim.shape[2], -1])
 
-  sys.stdout.write('Learning Dictionary 1...      \r')
-  sys.stdout.flush()
+  testim=normalize(testim.transpose())
 
-  d, a=LCA(x, 700, 200, num_dict_features=200)
-  visualize_dict(nodropd, [20, 10, 3], [16, 16])
+  d=np.load('dropout.npy')
 
+  nd=np.load('no_dropout.npy')
+ 
+  dict_, alphad=LCA(testim, 1, testim.shape[1], D=d)
+
+  dict_, alphand=LCA(testim, 1, testim.shape[1], D=nd)
+
+  newd=np.matmul(d, alphad)
+
+  newnd=np.matmul(nd, alphand)
+
+  for i in xrange(8, recd.shape[0]-7):
+
+    for j in xrange(8, recd.shape[1]-7):
+
+      dpatch=newd[:, (i-8)*(recd.shape[1]-7-8)+(j-8)].reshape([16, 16, 3])
+
+      ndpatch=newnd[:, (i-8)*(recd.shape[1]-7-8)+(j-8)].reshape([16, 16, 3])
+      
+      recd[i-8:i+8, j-8:j+8, :]+=dpatch
+
+      recnd[i-8:i+8, j-8:j+8, :]+=ndpatch
+
+  recd=recd/15
+ 
+  recnd=recnd/15
+
+  print(np.sum((recd-im)**2))
+
+  print(np.sum((recnd-im)**2))
+
+  imshow(recd)
   
+  imshow(recnd)
 
+  imshow(im)
 
+  imshow(np.absolute(im-recd))
+
+  imshow(np.absolute(im-recnd))
 
 
