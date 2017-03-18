@@ -1,44 +1,15 @@
-
-# coding: utf-8
-
-# In[1]:
-
-get_ipython().magic(u'matplotlib inline')
-import matplotlib.pyplot as plt
 import glob
 import os
 from scipy.misc import *
 import numpy as np
 import tensorflow as tf
 from scipy.io import loadmat
+from image_reader import *
+from skimage.util import view_as_windows as vaw
+import sys
 
 
-def visualize_dict(D, d_shape, patch_shape):
-  ''' Displays all sparse dictionary patches in one image.
-      args:
-           D: the sparse dictionary with size patch size x number of patches.
-           d_shape: a list or tuple containing the desired number of patches per 
-                    dimension of the dictionary. For example, a dictionary with
-                    400 patches could be viewed at 20 patches x 20 patches.
-           patch_shape: a list that specifies the width and height
-                        to reshape each patch to. '''
-
-  if np.size(d_shape)==2:
-    vis_d=np.zeros([d_shape[0]*patch_shape[0], d_shape[1]*patch_shape[1], 1])
-    resize_shp=[patch_shape[0], patch_shape[1], 1]
-  else:
-    vis_d=np.zeros([d_shape[0]*patch_shape[0], d_shape[1]*patch_shape[1], 3])
-    resize_shp=[patch_shape[0], patch_shape[1], 3]
-
-  for row in range(d_shape[0]):
-    for col in range(d_shape[1]):
-      resized_patch=np.reshape(D[:, row*d_shape[1]+col], resize_shp)
-      vis_d[row*patch_shape[0]:row*patch_shape[0]+patch_shape[0], 
-            col*patch_shape[1]:col*patch_shape[1]+patch_shape[1], :]=resized_patch
-  if vis_d.shape[2]==3:
-    plt.imshow(vis_d)
-  else:
-    plt.imshow(vis_d.reshape([vis_d.shape[0], vis_d.shape[1]]))
+ps=16
 
     
 def LCA(y, iters, batch_sz, num_dict_features=None, D=None):
@@ -71,25 +42,28 @@ def LCA(y, iters, batch_sz, num_dict_features=None, D=None):
   return sess.run(D), sess.run(a)
 
 
+
 with tf.Session() as sess:
-    x=loadmat('patches.mat')
-    x=x['data']
-    
-    drop_dict, drop_alpha=LCA(x, 1000, 70, num_dict_features=450)
-    visualize_dict(drop_dict, [25, 20], [16, 16])
 
+  x, y=read_ims('/home/mpcr/Documents/MT/CSDL/17flowers/jpg', 100)
 
-# In[ ]:
+  x=np.pad(x[:80, :, :, :], ((0, 0), (ps/2, ps/2), (ps/2, ps/2), (0, 0)), 'edge')
 
+  x=vaw(x, (1, ps, ps, 3))
 
+  x=x.reshape([x.shape[0]*
+	       x.shape[1]*
+	       x.shape[2]*
+	       x.shape[3], -1])
 
+  x=normalize(x.transpose())
 
-# In[ ]:
+  sys.stdout.write('Learning Dictionary 1...      \r')
+  sys.stdout.flush()
 
+  d, a=LCA(x, 700, 200, num_dict_features=200)
+  visualize_dict(nodropd, [20, 10, 3], [16, 16])
 
-
-
-# In[ ]:
 
 
 
